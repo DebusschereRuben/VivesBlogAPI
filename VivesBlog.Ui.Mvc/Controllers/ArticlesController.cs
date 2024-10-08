@@ -1,90 +1,110 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using VivesBlog.Model;
-using VivesBlog.Services;
+using VivesBlog.DTO.Requests;
+using VivesBlog.DTO.Results;
+using VivesBlog.SDK;
 
 namespace VivesBlog.Ui.Mvc.Controllers
 {
-    [Authorize]
     public class ArticlesController : Controller
     {
-        private readonly ArticleService _articleService;
-        private readonly PersonService _personService;
+        private readonly ArticleSDK _articleSDK;
+        private readonly PersonSDK _personSDK;
 
         public ArticlesController(
-            ArticleService articleService,
-            PersonService personService)
+            ArticleSDK articleSDK, PersonSDK personSDK)
         {
-            _articleService = articleService;
-            _personService = personService;
+            _articleSDK = articleSDK;
+            _personSDK = personSDK;
         }
-        public IActionResult Index()
+        [HttpGet]
+        public async Task<IActionResult> Index()
         {
-            var articles = _articleService.Find();
+            var articles = _articleSDK.Find();
             return View(articles);
         }
 
         [HttpGet]
         public IActionResult Create()
         {
-            return CreateEditView();
+            return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Create(Article article)
+        public async Task<IActionResult> Create(ArticleRequest request)
         {
             if (!ModelState.IsValid)
             {
-                return CreateEditView(article);
+                var article = new ArticleResult
+                {
+                    Title = request.Title,
+                    Content = request.Content,
+                    Description = request.Description,
+                    AuthorId = request.AuthorId,
+                    PublishedDate = request.PublishedDate,
+                };
+                return View(article);
             }
 
-            _articleService.Create(article);
+            await _articleSDK.Create(request);
 
             return RedirectToAction("Index");
         }
 
         [HttpGet]
-        public IActionResult Edit([FromRoute] int id)
+        public async Task<IActionResult> Edit([FromRoute] int id)
         {
-            var article = _articleService.Get(id);
+            var result = await _articleSDK.Get(id);
 
-            if (article is null)
+            if (!result.IsSuccess || result.Data is null)
             {
                 return RedirectToAction("Index");
             }
 
-            return CreateEditView(article);
+            return View(result.Data);
         }
 
         [HttpPost, ValidateAntiForgeryToken]
-        public IActionResult Edit([FromRoute] int id, [FromForm] Article article)
+        public async Task<IActionResult> Edit([FromRoute] int id, [FromForm] ArticleRequest request)
         {
             if (!ModelState.IsValid)
             {
-                return CreateEditView(article);
+                var result = await _articleSDK.Get(id);
+                if (!result.IsSuccess || result.Data is null)
+                {
+                    return RedirectToAction("Index");
+                }
+                var article = result.Data;
+                article.Title = request.Title;
+                article.Description = request.Description;
+                article.Content = request.Content;
+
+                return View(article);
             }
 
-            _articleService.Update(id, article);
+            await _articleSDK.Update(id, request);
 
             return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Delete([FromRoute] int id)
+        {
+            var result = await _articleSDK.Get(id);
+            if (!result.IsSuccess || result.Data is null)
+            {
+                return RedirectToAction("Index");
+            }
+            return View(result.Data);
         }
 
         [HttpPost("/[controller]/Delete/{id:int?}"), ValidateAntiForgeryToken]
-        public IActionResult DeleteConfirmed(int id)
+        public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            _articleService.Delete(id);
+            await _articleSDK.Delete(id);
 
             return RedirectToAction("Index");
-        }
-
-
-        private IActionResult CreateEditView(Article? article = null)
-        {
-            var authors = _personService.Find();
-            ViewBag.Authors = authors;
-
-            return View(article);
         }
     }
 }

@@ -1,23 +1,22 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
-using VivesBlog.Core;
-using VivesBlog.Services;
+using VivesBlog.SDK;
 using VivesBlog.Ui.Mvc.Models;
 
 namespace VivesBlog.Ui.Mvc.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly ArticleService _articleService;
+        private readonly ArticleSDK _articleSDK;
 
-        public HomeController(ArticleService articleService)
+        public HomeController(ArticleSDK articleSDK)
         {
-            _articleService = articleService;
+            _articleSDK = articleSDK;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var articles = _articleService.Find();
+            var articles = await _articleSDK.Find();
             return View(articles);
         }
 

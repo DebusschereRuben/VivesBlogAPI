@@ -1,0 +1,6 @@
+@VivesBlogAPI.API_HostAddress = http://localhost:5056
+
+GET {{VivesBlogAPI.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

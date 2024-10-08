@@ -1,6 +1,12 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Vives.Services.Model;
+using Vives.Services.Model.Extensions;
 using VivesBlog.Core;
+using VivesBlog.DTO.Requests;
+using VivesBlog.DTO.Results;
 using VivesBlog.Model;
+using VivesBlog.Services.Extensions.Projection;
+using VivesBlog.Services.Extensions.Validation;
 
 namespace VivesBlog.Services
 {
@@ -14,65 +20,104 @@ namespace VivesBlog.Services
         }
 
         //Find
-        public IList<Article> Find()
+        public async Task<IList<ArticleResult>> Find()
         {
-            return _dbContext.Articles
+            return await _dbContext.Articles
                 .Include(a => a.Author)
-                .ToList();
+                .Project()
+                .ToListAsync();
         }
 
         //Get (by id)
-        public Article? Get(int id)
+        public async Task<ServiceResult<ArticleResult>> Get(int id)
         {
-            return _dbContext.Articles
-                .FirstOrDefault(p => p.Id == id);
+            var serviceResult = new ServiceResult<ArticleResult>();
+
+            var article = await _dbContext.Articles
+                .Project()
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            serviceResult.Data = article;
+            if (article is null)
+            {
+                serviceResult.NotFound(nameof(Article), id);
+            }
+
+            return serviceResult;
         }
 
         //Create
-        public Article? Create(Article article)
+        public async Task<ServiceResult<ArticleResult>> Create(ArticleRequest request)
         {
-            article.PublishedDate = DateTime.UtcNow;
+            var serviceResult = new ServiceResult<ArticleResult>();
+
+            serviceResult.Validate(request);
+
+            if (!serviceResult.IsSuccess)
+            {
+                return serviceResult;
+            }
+
+            var article = new Article
+            {
+                Title = request.Title,
+                PublishedDate = request.PublishedDate,
+                Description = request.Description,
+                Content = request.Content,
+                AuthorId = request.AuthorId,
+            };
+
+            //article.PublishedDate = DateTime.UtcNow;
 
             _dbContext.Articles.Add(article);
-            _dbContext.SaveChanges();
+            await _dbContext.SaveChangesAsync();
 
-            return article;
+            return await Get(article.Id);
         }
 
         //Update
-        public Article? Update(int id, Article article)
+        public async Task<ServiceResult<ArticleResult>> Update(int id, ArticleRequest request)
         {
-            var dbArticle = _dbContext.Articles
-                .FirstOrDefault(p => p.Id == id);
-
-            if (dbArticle is null)
-            {
-                return null;
-            }
-
-            dbArticle.Title = article.Title;
-            dbArticle.Description = article.Description;
-            dbArticle.Content = article.Content;
-            dbArticle.AuthorId = article.AuthorId;
-
-            _dbContext.SaveChanges();
-
-            return dbArticle;
-        }
-
-        //Delete
-        public void Delete(int id)
-        {
-            var article = _dbContext.Articles
-                .FirstOrDefault(p => p.Id == id);
+            var serviceResult = new ServiceResult<ArticleResult>();
+ 
+            var article = await _dbContext.Articles
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (article is null)
             {
-                return;
+                serviceResult.NotFound(nameof(Article), id);
+                return serviceResult;
+            }
+
+            article.Title = article.Title;
+            article.Description = article.Description;
+            article.Content = article.Content;
+            article.AuthorId = article.AuthorId;
+
+            await _dbContext.SaveChangesAsync();
+
+            return await Get(id);
+        }
+        //TODO continue
+        //Delete
+        public async Task<ServiceResult> Delete(int id)
+        {
+            var serviceResult = new ServiceResult();
+
+            var article = await _dbContext.Articles
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (article is null)
+            {
+                serviceResult.NotFound(nameof(Article), id);
+                return serviceResult;
             }
 
             _dbContext.Articles.Remove(article);
-            _dbContext.SaveChanges();
+            await _dbContext.SaveChangesAsync();
+
+            serviceResult.Deleted(nameof(Article));
+            return serviceResult;
         }
 
     }
